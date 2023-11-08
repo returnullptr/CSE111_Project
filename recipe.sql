@@ -79,3 +79,16 @@ JOIN rein ON ri_recipekey = r_recipekey
 JOIN ingredient ON i_ingredientkey = ri_ingredientkey
 JOIN nutrition ON n_nutritionkey = i_nutritionkey
 WHERE n_name = 'fat';
+
+SELECT i_name FROM ingredient WHERE i_ingredientkey IN (SELECT ri_ingredientkey FROM rein WHERE ri_recipekey IN (SELECT r_recipekey FROM recipe WHERE r_name = 'sushi'));
+
+SELECT
+    r.r_name AS RecipeName,
+    c.c_name AS CuisineType,
+    m.m_name AS MealCourse
+FROM
+    recipe r
+INNER JOIN cuisine c ON r.r_cuisinekey= c.c_cuisinekey
+INNER JOIN mealcourse m ON r.r_mealcoursekey = m.m_mealcoursekey;
+
+SELECT r_name FROM recipe WHERE r_techniquekey IN (SELECT t_techniquekey FROM technique WHERE t_name = 'slicing');
