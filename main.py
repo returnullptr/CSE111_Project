@@ -162,6 +162,147 @@ def insert_recipe_interactive():
     insert_recipe((recipe_name, technique_key, cuisine_key, mealcourse_key, instructions))
 
 
+def add_ingredient():
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Prompt user to enter ingredient name
+    ingredient_name = input("Enter the name of the new ingredient: ")
+    cursor.execute("INSERT INTO ingredient (i_name) VALUES (?)", (ingredient_name,))
+
+    # Fetch the auto-generated ingredient key
+    ingredient_key = cursor.lastrowid
+
+    # Prompt user to add allergen and nutrition type
+    display_choices('allergen')
+    allergen_key = input("Enter the allergen key (enter 0 for none): ")
+    display_choices('nutrition')
+    nutrition_key = input("Enter the nutrition type key: ")
+
+    # Update the ingredient with allergen and nutrition keys
+    cursor.execute("UPDATE ingredient SET i_allergenkey = ?, i_nutritionkey = ? WHERE i_ingredientkey = ?",
+                   (allergen_key if allergen_key != '0' else None, nutrition_key, ingredient_key))
+
+    conn.commit()
+    conn.close()
+    print("Ingredient added successfully.")
+
+
+def delete_ingredient():
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Display all ingredients
+    display_choices('ingredient')
+
+    # Prompt user to enter ingredient key or name to be deleted
+    identifier = input("Enter the ingredient key or name to delete: ")
+
+    # Determine if identifier is key (integer) or name (string)
+    if identifier.isdigit():
+        cursor.execute("DELETE FROM ingredient WHERE i_ingredientkey = ?", (int(identifier),))
+    elif isinstance(identifier, str):
+        cursor.execute("DELETE FROM ingredient WHERE i_name = ?", (identifier,))
+    else:
+        print("Invalid identifier type. Please provide an integer key or a string name.")
+
+    conn.commit()
+    conn.close()
+    print("Ingredient deleted successfully.")
+
+
+def edit_ingredient():
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Display all ingredients
+    display_choices('ingredient')
+
+    # Let user choose which ingredient to edit
+    ingredient_key = input("Enter the key of the ingredient to edit: ")
+
+    # Give options to edit
+    print("1. Edit Ingredient Name")
+    print("2. Edit Nutrition Type")
+    print("3. Edit Allergen Type")
+    choice = input("Choose an option: ")
+
+    if choice == '1':
+        new_name = input("Enter the new name for the ingredient: ")
+        cursor.execute("UPDATE ingredient SET i_name = ? WHERE i_ingredientkey = ?", (new_name, ingredient_key))
+    elif choice == '2':
+        display_choices('nutrition')
+        new_nutrition_key = input("Enter the new nutrition type key: ")
+        cursor.execute("UPDATE ingredient SET i_nutritionkey = ? WHERE i_ingredientkey = ?", (new_nutrition_key, ingredient_key))
+    elif choice == '3':
+        display_choices('allergen')
+        new_allergen_key = input("Enter the new allergen key (enter 0 for none): ")
+        cursor.execute("UPDATE ingredient SET i_allergenkey = ? WHERE i_ingredientkey = ?",
+                       (new_allergen_key if new_allergen_key != '0' else None, ingredient_key))
+    else:
+        print("Invalid option selected.")
+
+    conn.commit()
+    conn.close()
+    print("Ingredient updated successfully.")
+
+
+def add_ingredient_to_recipe(recipe_key, ingredient_key):
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Insert the ingredient into the rein table linked with the recipe
+    cursor.execute("INSERT INTO rein (ri_recipekey, r_ingredientkey) VALUES (?, ?)", (recipe_key, ingredient_key))
+
+    conn.commit()
+    conn.close()
+    print("Ingredient added to recipe successfully.")
+
+
+def delete_ingredient_from_recipe(recipe_key, ingredient_key):
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Delete the ingredient from the rein table for the given recipe
+    cursor.execute("DELETE FROM rein WHERE ri_recipekey = ? AND r_ingredientkey = ?", (recipe_key, ingredient_key))
+
+    conn.commit()
+    conn.close()
+    print("Ingredient removed from recipe successfully.")
+
+
+def edit_ingredients_of_recipe(recipe_key):
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # Display ingredients currently used by the recipe
+    print(f"Current ingredients for recipe {recipe_key}:")
+    cursor.execute("SELECT i_ingredientkey, i_name FROM rein JOIN ingredient ON ri_ingredientkey = i_ingredientkey WHERE ri_recipekey = ?", (recipe_key,))
+    current_ingredients = cursor.fetchall()
+    for current_ingredient in current_ingredients:
+        print(f"{current_ingredient[0]}: {current_ingredient[1]}")
+
+    # Options to add or remove ingredients
+    print("\nOptions:")
+    print("1. Add an ingredient to the recipe")
+    print("2. Remove an ingredient from the recipe")
+    choice = input("Choose an option: ")
+
+    if choice == '1':
+        # Show available ingredients
+        display_choices('ingredient')
+        ingredient_key = input("Enter the ingredient key to add: ")
+        add_ingredient_to_recipe(recipe_key, ingredient_key)
+    elif choice == '2':
+        ingredient_key = input("Enter the ingredient key to remove: ")
+        delete_ingredient_from_recipe(recipe_key, ingredient_key)
+    else:
+        print("Invalid option selected.")
+
+    conn.close()
+
+
+
 def add_nutrition(name):
     conn = connect_db()
     cursor = conn.cursor()
@@ -177,8 +318,8 @@ def delete_nutrition(identifier):
     cursor = conn.cursor()
 
     # Check if the identifier is an integer (key) or string (name)
-    if isinstance(identifier, int):
-        cursor.execute("DELETE FROM nutrition WHERE n_nutritionkey = ?", (identifier,))
+    if identifier.isdigit():
+        cursor.execute("DELETE FROM nutrition WHERE n_nutritionkey = ?", (int(identifier),))
     elif isinstance(identifier, str):
         cursor.execute("DELETE FROM nutrition WHERE n_name = ?", (identifier,))
     else:
@@ -198,31 +339,7 @@ def edit_nutrition(key, new_name):
     conn.close()
 
 
-def view_nutrition():
-    display_choices('Nutrition')
-
-
-def add_ingredient_to_recipe(recipe_key, ingredient_key):
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute("INSERT INTO rein (ri_recipekey, ri_ingredientkey) VALUES (?, ?)", (recipe_key, ingredient_key))
-
-    conn.commit()
-    conn.close()
-
-
-def delete_ingredient_from_recipe(recipe_key, ingredient_key):
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM rein WHERE ri_recipekey = ? AND ri_ingredientkey = ?", (recipe_key, ingredient_key))
-
-    conn.commit()
-    conn.close()
-
-
-def edit_nutrition_of_recipe(recipe_key, new_nutrition_key):
+def edit_nutrition_of_ingredient(recipe_key, new_nutrition_key):
     # This assumes that the recipe table has a direct link to nutrition,
     # Modify as per your schema
     conn = connect_db()
@@ -232,12 +349,17 @@ def edit_nutrition_of_recipe(recipe_key, new_nutrition_key):
     conn.close()
 
 
+def view_nutrition():
+    display_choices('nutrition')
+
+
 def add_allergen(allergen_name):
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO Allergen (a_name) VALUES (?)", (allergen_name,))
     conn.commit()
     conn.close()
+
 
 def delete_allergen(identifier):
     conn = connect_db()
@@ -254,21 +376,86 @@ def delete_allergen(identifier):
     conn.commit()
     conn.close()
 
-def edit_allergen_of_recipe(recipe_key, new_allergen_key):
-    # Adjust as per your actual schema
+# this should not be editable as allergen and nutrition are linked to ingredient
+def edit_allergen_of_ingredient(recipe_key):
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE Ingredient SET i_allergenkey = ? WHERE i_ingredientkey IN (SELECT r_ingridentkey FROM rein WHERE ri_recipekey = ?)", (new_allergen_key, recipe_key))
-    conn.commit()
+
+    # Fetch and display the current technique for the recipe
+    cursor.execute(
+        "SELECT a_name "
+        "FROM allergen "
+        "JOIN ingredient ON a_allergenkey = i_allergenkey"
+        "JOIN rein ON i_ingredientkey = ri_ingredientkey"
+        "JOIN recipe ON ri_recipekey = r_recipekey WHERE r_recipekey = ?",
+        (recipe_key,))
+    current_allergens = cursor.fetchall()
+    if current_techniques:
+        for current_allergen in current_allergens:
+            print(f"Current allergen for Recipe {recipe_key}: {current_allergen}")
+    else:
+        print(f"No technique found for Recipe {recipe_key}")
+        return
+
+    # Display all available techniques
+    print("\nAvailable Techniques:")
+    cursor.execute("SELECT a_allergenkey, a_name FROM allergen")
+    available_allergens = cursor.fetchall()
+    for available_allergen in available_allergens:
+        print(f"{available_allergen[0]}: {available_allergen[1]}")
+
+    # User input for new technique
+    new_allergen = input("Enter new allergen name or key: ")
+
+    # Determine if the input is a name or a key
+    new_allergen_key = None
+    if new_allergen.isdigit():
+        new_allergen_key = int(new_technique)
+    else:
+        for key, name in available_allergens:
+            if name.lower() == new_allergen.lower():
+                new_allergen_key = key
+                break
+
+    if new_allergen_key is not None:
+        # Update the recipe with the new technique
+
+        conn.commit()
+        print("Technique updated successfully.")
+    else:
+        print("Invalid technique. Please try again.")
+
     conn.close()
 
 
-def add_technique(technique_name):
+def edit_allergen():
+    print("\nEdit Allergens")
+    print("1. Add New Allergens")
+    print("2. Delete Allergens")
+    print("3. Return to Previous Menu")
+
+    choice = input("Enter your choice: ")
+
+    if choice == '1':
+        add_allergen()
+    elif choice == '2':
+        delete_allergen()
+    elif choice == '3':
+        return
+    else:
+        print("Invalid choice. Please try again.")
+
+
+def add_technique():
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO Technique (t_name) VALUES (?)", (technique_name,))
+
+    new_name = input("Enter technique name to be added: ")
+    cursor.execute("INSERT INTO Technique (t_name) VALUES (?)", (new_name,))
+
     conn.commit()
     conn.close()
+
 
 def delete_technique():
     conn = connect_db()
@@ -288,30 +475,66 @@ def delete_technique():
     conn.commit()
     conn.close()
 
-def edit_technique_of_recipe(recipe_key, new_technique_key):
+
+def edit_technique_of_recipe(recipe_key):
     conn = connect_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE Recipe SET r_techniquekey = ? WHERE r_recipekey = ?", (new_technique_key, recipe_key))
-    conn.commit()
+
+    # Fetch and display the current technique for the recipe
+    cursor.execute(
+        "SELECT t_name FROM recipe JOIN technique ON r_techniquekey = t_techniquekey WHERE r_recipekey = ?",
+        (recipe_key,))
+    current_technique = cursor.fetchone()
+    if current_technique:
+        print(f"Current technique for Recipe {recipe_key}: {current_technique[0]}")
+    else:
+        print(f"No technique found for Recipe {recipe_key}")
+        return
+
+    # Display all available techniques
+    print("\nAvailable Techniques:")
+    cursor.execute("SELECT t_techniquekey, t_name FROM technique")
+    available_techniques = cursor.fetchall()
+    for technique in available_techniques:
+        print(f"{technique[0]}: {technique[1]}")
+
+    # User input for new technique
+    new_technique = input("Enter new technique name or key: ")
+
+    # Determine if the input is a name or a key
+    new_technique_key = None
+    if new_technique.isdigit():
+        new_technique_key = int(new_technique)
+    else:
+        for key, name in available_techniques:
+            if name.lower() == new_technique.lower():
+                new_technique_key = key
+                break
+
+    if new_technique_key is not None:
+        # Update the recipe with the new technique
+        cursor.execute("UPDATE recipe SET r_techniquekey = ? WHERE r_recipekey = ?", (new_technique_key, recipe_key))
+        conn.commit()
+        print("Technique updated successfully.")
+    else:
+        print("Invalid technique. Please try again.")
+
     conn.close()
 
 
 def edit_technique():
     print("\nEdit Techniques")
     print("1. Add New Technique")
-    print("2. Modify Existing Technique")
-    print("3. Delete Technique")
-    print("4. Return to Previous Menu")
+    print("2. Delete Technique")
+    print("3. Return to Previous Menu")
 
     choice = input("Enter your choice: ")
 
     if choice == '1':
-        add_technique()  # Implement this function to add a new technique
+        add_technique()
     elif choice == '2':
-        modify_technique()  # Implement this function to modify an existing technique
+        delete_technique()
     elif choice == '3':
-        delete_technique()  # Implement this function to delete a technique
-    elif choice == '4':
         return
     else:
         print("Invalid choice. Please try again.")
@@ -351,18 +574,41 @@ def edit_mealcourse_of_recipe(recipe_key):
     conn.close()
 
 
+def edit_mealcourse():
+    return
+
+
+def add_cuisine():
+    return
+
+
+def delete_cuisine():
+    return
+
+
+def edit_cuisine():
+    return
+
+
+def edit_cuisine_of_recipe():
+    return
+
+
+
+
 def edit_recipe():
+    display_choices('recipe')
     recipe_key = input("Enter the key of the recipe you want to edit: ")
 
     while True:
         print("\nEdit Recipe Options")
         print("1. Edit Recipe's Ingredients")
-        print("2. Edit Recipe's Allergens")
-        print("3. Edit Recipe's Nutrition Type")
-        print("4. Edit Recipe's Technique")
-        print("5. Edit Recipe's Cuisine")
-        print("6. Edit Recipe's Meal Course")
-        print("7. Return to Previous Menu")
+        # print("2. Edit Recipe's Allergens")
+        # print("3. Edit Recipe's Nutrition Type")
+        print("2. Edit Recipe's Technique")
+        print("3. Edit Recipe's Cuisine")
+        print("4. Edit Recipe's Meal Course")
+        print("5. Return to Previous Menu")
 
         choice = input("Enter your choice: ")
 
@@ -390,6 +636,7 @@ def edit_menu():
     while True:
         print("\nEdit Menu")
         print("1. Edit Recipe")
+        # edit ingredient provides options to also edit its corresponding nutrition and allergen
         print("2. Edit Ingredients")
         print("3. Edit Nutrition Types")
         print("4. Edit Allergens")
@@ -434,6 +681,7 @@ def main_menu():
         print("\nRecipeBook Database Management")
         print("1. Create Tables")
         print("2. Drop Table")
+        # insert new recipe should add other necessary table info cuisine, mealcourse, technique, ingredients via rein
         print("3. Insert New Recipe")
         print("4. View All Recipes")
         print("5. Edit")
